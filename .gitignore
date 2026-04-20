@@ -1,0 +1,22 @@
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Tool 产物
+prof_out/
+*.npz
+*.pt
+*.ckpt
+*.safetensors
+
+# Consolidation 临时
+.consolidation-tmp/
+docs/EVOLUTION-STATS.md   # 由 tools/evolve.py 产出，不必追踪（或按需放开）

@@ -1,0 +1,81 @@
+# Ascend-Forge 内核配置（平台无关）
+# 各 adapter 可以读取此文件，翻译成自己的格式。
+
+version: 0.1.0
+
+agent:
+  name: ascend-forge
+  persona_file: .agent/system_prompt.md
+  default_language: zh-CN
+
+paths:
+  rules_active: rules/ACTIVE.md
+  rules_proposals: rules/proposals/
+  rules_archive: rules/archive/
+  memory_index: memory/INDEX.md
+  wiki_index: wiki/INDEX.md
+  wiki_index_jsonl: wiki/INDEX.jsonl
+  cases_index: cases/INDEX.jsonl
+  skills_index: skills/INDEX.md
+
+write_whitelist:
+  - memory/**
+  - skills/**
+  - wiki/**
+  - cases/**
+  - rules/proposals/**
+
+write_denylist:
+  - rules/ACTIVE.md
+  - rules/archive/**
+  - docs/**
+  - .agent/**
+  - adapters/**
+  - CLAUDE.md
+  - AGENTS.md
+  - README.md
+
+evolution:
+  # 单次任务产出上限（防噪声爆炸）
+  per_task_limits:
+    memory: 3
+    skill: 1
+    rule_proposal: 1
+    wiki_append: unlimited
+
+  # 晋升门槛
+  rule_promotion:
+    min_evidence: 3           # 至少 3 个 case 证据
+    require_user_approval: true
+
+  # GC / TTL
+  memory_ttl_days: 180
+  case_retention_days: 730    # 案例永不自动删，只会标 archive
+
+  # Consolidation 触发
+  consolidate_every_n_cases: 10
+
+retrieval:
+  # 默认不强制向量库；先 grep + tag + BM25 够用
+  backend: grep               # grep | bm25 | hybrid-embedding
+  top_k_cases: 3
+  top_k_memory: 8
+
+subagents:
+  - agents/ascend-adapter.md
+  - agents/ascend-deployer.md
+  - agents/ascend-tuner.md
+  - agents/ascend-diagnoser.md
+  - agents/ascend-benchmarker.md
+  - agents/ascend-env-doctor.md
+  - agents/knowledge-curator.md
+
+safety:
+  dangerous_command_patterns:
+    - "rm -rf"
+    - "dd if="
+    - "mkfs"
+    - "modprobe"
+    - "rmmod"
+    - "> /dev/"
+  on_dangerous: confirm       # confirm | deny
