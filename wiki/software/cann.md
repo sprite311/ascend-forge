@@ -109,6 +109,7 @@ _由 wiki link checker 自动维护。_
 - [docker-davinci-mount](../errors/docker-davinci-mount.md)
 - [driver-firmware-mismatch](../errors/driver-firmware-mismatch.md)
 - [general-debug](../playbooks/general-debug.md)
+- [hf-to-npu-7-step](../playbooks/hf-to-npu-7-step.md)
 - [mindformers](mindformers.md)
 - [mindie](mindie.md)
 - [mindspore](mindspore.md)

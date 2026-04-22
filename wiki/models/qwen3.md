@@ -77,4 +77,5 @@ _由 `ascend-benchmarker` 按基准任务追加（TPS、首 token 时延、长�
 _无反链。_
 
 ## Changelog
+- 2026-04-22: 追加 Qwen2/2.5 实战细节（source: training-knowledge-cutoff-2025-05）；**标注 Qwen3 截止期内信息不全**，需真机回执修正。
 - 2026-04-20: 种子页创建（Wave 2）；架构 / 适配状态 / 部署命令为公开资料 + 昇腾社区口径；基线字段空待填。source: case/2026-04-20-wave2-seed-pages

@@ -112,6 +112,7 @@ _由 `ascend-deployer` 按部署经历追加。_
 - [deepseek-v3](../models/deepseek-v3.md)
 - [flash-attention](../operators/flash-attention.md)
 - [general-debug](../playbooks/general-debug.md)
+- [hf-to-npu-7-step](../playbooks/hf-to-npu-7-step.md)
 - [llama3](../models/llama3.md)
 - [mindformers](mindformers.md)
 - [npu-oom-fragmentation](../errors/npu-oom-fragmentation.md)

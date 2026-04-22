@@ -91,6 +91,8 @@ python -m vllm.entrypoints.openai.api_server \
 - [acl-507018](../errors/acl-507018.md)
 - [cann](cann.md)
 - [deepseek-v3](../models/deepseek-v3.md)
+- [flash-attention](../operators/flash-attention.md)
+- [hf-to-npu-7-step](../playbooks/hf-to-npu-7-step.md)
 - [llama3](../models/llama3.md)
 - [mindie](mindie.md)
 - [npu-oom-fragmentation](../errors/npu-oom-fragmentation.md)

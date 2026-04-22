@@ -78,4 +78,5 @@ _由 `ascend-tuner` / `ascend-benchmarker` 追加。_
 _无反链。_
 
 ## Changelog
+- 2026-04-22: 追加迁移配方 + 踩坑清单（source: training-knowledge-cutoff-2025-05）；仍 draft 待真机。
 - 2026-04-20: 种子页创建（Wave 2）；架构 / 适配 / 显存预算为公开资料口径。source: case/2026-04-20-wave2-seed-pages
