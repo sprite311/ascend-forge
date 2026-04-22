@@ -44,6 +44,9 @@
 - **R032** Rule 晋升：需用户 `/rules promote` 或 ≥ 3 独立 case 证据；被取代的 rule 移 `archive/`，ID 不复用。
   *evidence: bootstrap · since 2026-04-20*
 
+- **R033** 命中 `status: draft` 或含 `TBD` 的 wiki 页时，回答必须：(1) 首行 `⚠️ 低置信度` 标注 (2) 给验证命令 (3) 不把猜测值写入 `memory/facts/`。
+  *evidence: 3 cases · promoted from `seed-critical-wiki-before-first-use` · since 2026-04-21*
+
 ---
 
 ## 说明

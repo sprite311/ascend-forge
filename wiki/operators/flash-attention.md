@@ -33,6 +33,8 @@ TBD
 
 ## Backlinks
 <!-- auto -->
+- [mindie](../software/mindie.md)
+- [rotary-embedding](rotary-embedding.md)
 
 ## Changelog
 - 2026-04-20: 占位创建。

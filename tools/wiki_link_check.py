@@ -1,46 +1,25 @@
 #!/usr/bin/env python3
 """
-Wiki 链接校验 + backlinks 维护。
+Wiki 链接校验 + backlinks 维护 + INDEX.jsonl 生成。
 
-功能（骨架）：
-- 解析 wiki/**/*.md 的 frontmatter（含 related:）
-- 检查 related 指向的 id 是否存在
-- 为每个目标页生成 ## Backlinks 清单（幂等更新）
-- 输出 wiki/INDEX.jsonl
-
-当前仅做解析 + 干跑报告，不写回文件。
+用法：
+  python3 tools/wiki_link_check.py            # 干跑：只报告
+  python3 tools/wiki_link_check.py --apply    # 写入 INDEX.jsonl + 更新各页 Backlinks
+  python3 tools/wiki_link_check.py --strict   # 发现 related 缺失时以 exit 2 失败（CI 用）
 """
 from __future__ import annotations
+import argparse
 import json
 import re
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from _common import ROOT, parse_frontmatter  # noqa: E402
+
 WIKI = ROOT / "wiki"
-FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
-
-
-def parse_frontmatter(text: str) -> dict:
-    m = FRONTMATTER_RE.match(text)
-    if not m:
-        return {}
-    # 轻量 yaml 解析：仅支持本项目常用的 key: value / key: [a, b]
-    out: dict = {}
-    for raw in m.group(1).splitlines():
-        if not raw.strip() or raw.startswith("#"):
-            continue
-        if ":" not in raw:
-            continue
-        k, v = raw.split(":", 1)
-        k = k.strip()
-        v = v.strip()
-        if v.startswith("[") and v.endswith("]"):
-            items = [x.strip().strip('"').strip("'") for x in v[1:-1].split(",") if x.strip()]
-            out[k] = items
-        else:
-            out[k] = v.strip('"').strip("'")
-    return out
+BACKLINKS_BLOCK_RE = re.compile(
+    r"(## Backlinks\s*\n)(.*?)(?=\n## |\Z)", re.DOTALL
+)
 
 
 def collect() -> dict:
@@ -48,7 +27,7 @@ def collect() -> dict:
     if not WIKI.exists():
         return pages
     for p in WIKI.rglob("*.md"):
-        if p.name.upper() == "INDEX.MD" or p.name.upper() == "README.MD":
+        if p.name.upper() in ("INDEX.MD", "README.MD"):
             continue
         try:
             text = p.read_text(encoding="utf-8")
@@ -57,15 +36,63 @@ def collect() -> dict:
         fm = parse_frontmatter(text)
         if not fm.get("id"):
             continue
-        pages[fm["id"]] = {"path": str(p.relative_to(ROOT)), "fm": fm}
+        pages[fm["id"]] = {
+            "path": str(p.relative_to(ROOT)),
+            "abs": p,
+            "fm": fm,
+            "text": text,
+        }
     return pages
 
 
+def compute_backlinks(pages: dict) -> dict:
+    back: dict = {pid: [] for pid in pages}
+    for src, info in pages.items():
+        for rid in info["fm"].get("related", []) or []:
+            if rid in pages and rid != src:
+                back[rid].append(src)
+    return {k: sorted(set(v)) for k, v in back.items()}
+
+
+def write_backlinks(info: dict, backlinks: list[str], pages: dict) -> bool:
+    text = info["text"]
+    src_path = info["abs"]
+    if not backlinks:
+        new_block = "<!-- auto -->\n_无反链。_\n"
+    else:
+        items = []
+        for bid in backlinks:
+            target = pages[bid]["abs"]
+            rel = Path(target).relative_to(src_path.parent.resolve(), walk_up=True) \
+                if sys.version_info >= (3, 12) else Path(
+                    __import__("os").path.relpath(target, src_path.parent)
+                )
+            items.append(f"- [{bid}]({rel.as_posix() if hasattr(rel,'as_posix') else rel})")
+        new_block = "<!-- auto -->\n" + "\n".join(items) + "\n"
+
+    m = BACKLINKS_BLOCK_RE.search(text)
+    if m:
+        new = text[:m.start(2)] + new_block + text[m.end():]
+        if text.endswith("\n") and not new.endswith("\n"):
+            new += "\n"
+    else:
+        # 无 Backlinks 小节则不强插入；留给 curator 补模板
+        return False
+    if new != text:
+        src_path.write_text(new, encoding="utf-8")
+        return True
+    return False
+
+
 def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--apply", action="store_true", help="写入 INDEX.jsonl + 更新 Backlinks")
+    ap.add_argument("--strict", action="store_true", help="related 缺失时返回非 0 退出码")
+    args = ap.parse_args()
+
     pages = collect()
     print(f"[wiki-check] 收集到 {len(pages)} 个 wiki 页。")
 
-    # 检查 related 指向
     missing = []
     for pid, info in pages.items():
         for rid in info["fm"].get("related", []) or []:
@@ -75,19 +102,32 @@ def main() -> int:
         print(f"[wiki-check] ⚠️ related 指向不存在的目标 {len(missing)} 条：")
         for a, b in missing[:20]:
             print(f"  - {a} -> {b}")
+        if args.strict:
+            return 2
     else:
         print("[wiki-check] ✅ 所有 related 指向都存在。")
 
-    # 导出 INDEX.jsonl
+    # INDEX.jsonl
     out_path = WIKI / "INDEX.jsonl"
     lines = []
     for pid in sorted(pages):
         rec = {"id": pid, **pages[pid]["fm"], "path": pages[pid]["path"]}
         lines.append(json.dumps(rec, ensure_ascii=False))
-    print(f"[wiki-check] 预期写入 {out_path} 共 {len(lines)} 行（干跑，未落盘）。")
 
-    # 真写：取消下行注释
-    # out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if args.apply:
+        out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"[wiki-check] ✏️  wrote {out_path} ({len(lines)} lines).")
+
+        # Backlinks
+        back = compute_backlinks(pages)
+        touched = 0
+        for pid, info in pages.items():
+            if write_backlinks(info, back[pid], pages):
+                touched += 1
+        print(f"[wiki-check] ✏️  backlinks 更新了 {touched} 个页面。")
+    else:
+        print(f"[wiki-check] 预期写入 {out_path} 共 {len(lines)} 行（干跑，未落盘）。")
+        print("[wiki-check] 加 --apply 真正写入并同步各页 Backlinks。")
 
     return 0
 

@@ -15,6 +15,7 @@
 | [benchmark-baseline](benchmark-baseline/SKILL.md) | benchmark / 基线 / 性能测试 / tps / ttft / tpot | ascend-benchmarker |
 | [ascend-troubleshoot](ascend-troubleshoot/SKILL.md) | 昇腾 / Ascend / NPU / CANN / torch_npu / MindSpore / Atlas / 910B / 910C / 310P / MindIE / npu-smi / HCCL / AscendCL | ascend-diagnoser |
 | [knowledge-capture](knowledge-capture/SKILL.md) | task_end / /evolve / /curate / 记住 / 以后都 / 我偏好 | knowledge-curator |
+| [wiki-consolidate-draft-to-stable](wiki-consolidate-draft-to-stable/SKILL.md) | consolidation / /evolve / draft 升 stable / wiki 稳定度 | knowledge-curator |
 
 ---
 

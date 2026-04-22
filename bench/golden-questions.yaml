@@ -1,0 +1,297 @@
+# Golden Questions · Ascend-Forge 路由回归集
+#
+# 用途：每次修改 CLAUDE.md 的路由表 / subagent 定义 / 关键词后，跑
+#   python3 tools/bench.py
+# 看 pass/fail。分流正确率 < 90% 就不应 merge。
+#
+# 字段说明：
+#   id                 — 稳定 id，改问题可以，改 id 不行（会丢失历史）
+#   question           — 用户原始问题（用自然口语，不用过度学术化）
+#   expected_subagent  — 期望路由到哪个 subagent（见 agents/*.md）
+#   expected_wiki_hits — 期望回答会触发哪些 wiki 页（按 id）
+#   category           — migration / deployment / tuning / diagnosis / env / benchmark
+#   difficulty         — easy / medium / hard（hard 指需要跨 subagent 协作）
+#   notes              — 路由理由 / 评分时要看的关键点
+#
+# ⚠️ 这里的 `expected_subagent` 是**主路由**；实际可能会 hand-off，
+#    但起手 subagent 必须对，否则分流失败。
+
+questions:
+
+  # ─── ascend-adapter (model migration / torch_npu) ──────────────────────
+  - id: q01-migrate-hf-to-npu
+    question: "我有一个 HuggingFace 的 Qwen2-7B 模型，怎么把它跑到 910B 上？"
+    expected_subagent: ascend-adapter
+    expected_wiki_hits: [torch-npu, 910b]
+    category: migration
+    difficulty: easy
+    notes: "关键词：HuggingFace / 跑到 910B → 迁移任务。"
+
+  - id: q02-ops-replace
+    question: "我的模型里有一个 flash_attn 算子，torch_npu 上没有对应实现，怎么替换？"
+    expected_subagent: ascend-adapter
+    expected_wiki_hits: [flash-attention, torch-npu]
+    category: migration
+    difficulty: medium
+    notes: "算子替换是 adapter 的核心职责。"
+
+  - id: q03-precision-gap
+    function: ""
+    question: "GPU 上 loss 正常，昇腾上 loss 偏高 1e-3，怎么定位精度差异？"
+    expected_subagent: ascend-adapter
+    expected_wiki_hits: [torch-npu]
+    category: migration
+    difficulty: hard
+    notes: "精度对齐 - adapter 主责；若仅报错则 diagnoser。"
+
+  # ─── ascend-deployer (serving) ──────────────────────────────────────
+  - id: q04-mindie-deploy
+    question: "qwen3-32b 怎么用 MindIE 起一个 OpenAI 兼容接口的推理服务？"
+    expected_subagent: ascend-deployer
+    expected_wiki_hits: [mindie, qwen3]
+    category: deployment
+    difficulty: easy
+    notes: "MindIE + OpenAI 接口 → 明确是 deployer。"
+
+  - id: q05-vllm-ascend-start
+    question: "vLLM-Ascend 在 910B 上怎么启动 DeepSeek-V3 的多机推理？"
+    expected_subagent: ascend-deployer
+    expected_wiki_hits: [vllm-ascend, deepseek-v3, 910b]
+    category: deployment
+    difficulty: hard
+    notes: "vLLM-Ascend + 多机 → deployer。可能 hand-off env-doctor 查 HCCL。"
+
+  - id: q06-ranktable
+    question: "多节点训练启动时 ranktable.json 怎么配？"
+    expected_subagent: ascend-deployer
+    expected_wiki_hits: [hccl-multi-node-network, mindformers]
+    category: deployment
+    difficulty: medium
+    notes: "ranktable 是分布式启动配置，deployer 主管。"
+
+  # ─── ascend-tuner (perf / mem / latency) ────────────────────────────
+  - id: q07-w8a8-quant
+    question: "qwen2-72b 推理想做 W8A8 量化，在昇腾上怎么搞？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: [mindie]
+    category: tuning
+    difficulty: medium
+    notes: "量化 = tuner 领域。"
+
+  - id: q08-kv-cache-tune
+    question: "vLLM-Ascend 显存占满了，block-size 和 max-total-tokens 怎么调？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: [vllm-kv-cache-alloc-failed, vllm-ascend]
+    category: tuning
+    difficulty: medium
+    notes: "KV cache 参数调优 = tuner。"
+
+  - id: q09-msprof
+    question: "msprof profile 抓完了不知道怎么看，瓶颈在哪？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: []
+    category: tuning
+    difficulty: hard
+    notes: "profiling 分析 = tuner（与 diagnoser 共享 skill）。"
+
+  # ─── ascend-diagnoser (error triage) ────────────────────────────────
+  - id: q10-acl-507018
+    question: "一跑 generate() 就报 ACL 507018，怎么回事？"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: [acl-507018]
+    category: diagnosis
+    difficulty: easy
+    notes: "明确的报错码 → diagnoser。"
+
+  - id: q11-hccl-timeout
+    question: "多机训练跑一半 HCCL 超时了，怎么查？"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: [hccl-residual-process, hccl-multi-node-network]
+    category: diagnosis
+    difficulty: medium
+    notes: "HCCL 超时 → diagnoser 先判定，可能 hand-off env-doctor。"
+
+  - id: q12-oom-fragmentation
+    question: "推理服务跑了 3 天后 OOM，重启又没事，怎么定位？"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: [npu-oom-fragmentation]
+    category: diagnosis
+    difficulty: medium
+    notes: "长跑 OOM = 碎片化，diagnoser 主责。"
+
+  # ─── ascend-env-doctor (env / driver / hardware) ────────────────────
+  - id: q13-cann-version
+    question: "装 CANN 应该装哪个版本？我的 torch 是 2.1。"
+    expected_subagent: ascend-env-doctor
+    expected_wiki_hits: [cann, torch-npu]
+    category: env
+    difficulty: easy
+    notes: "三件套匹配 - env-doctor 核心。"
+
+  - id: q14-driver-firmware
+    question: "npu-smi 报 driver / firmware version mismatch，怎么修？"
+    expected_subagent: ascend-env-doctor
+    expected_wiki_hits: [driver-firmware-mismatch]
+    category: env
+    difficulty: medium
+    notes: "驱动固件问题 → env-doctor。"
+
+  # ─── ascend-benchmarker ─────────────────────────────────────────────
+  - id: q15-benchmark-compare
+    question: "我想对比 910B 和 910C 在 Qwen2-72B 上的吞吐，怎么跑基准？"
+    expected_subagent: ascend-benchmarker
+    expected_wiki_hits: [910b, 910c]
+    category: benchmark
+    difficulty: medium
+    notes: "基准对比 → benchmarker。"
+
+  # ═══════════════════════════════════════════════════════════════════
+  # Wave 6.1 扩容：q16-q32（15 条），含对抗性关键词题
+  # 设计原则：
+  #   - 自然口语，不同于 q01-q15 的直白问法；
+  #   - 多题含"陷阱"关键词（命中另一 subagent 的强词），真实用户就是这么问的；
+  #   - 部分题**预期会 fail**，失败正好暴露关键词路由的弱点，不修题以"过测"。
+  # ═══════════════════════════════════════════════════════════════════
+
+  # ─── 更多 adapter 用例（2 条） ───────────────────────────────────────
+  - id: q16-migrate-to-mindspore
+    question: "我想把 PyTorch 写的 LLaMA2 迁移到 MindSpore，有什么坑？"
+    expected_subagent: ascend-adapter
+    expected_wiki_hits: [mindspore]
+    category: migration
+    difficulty: medium
+    notes: "MindSpore 迁移 = adapter（不是 deployer）。"
+
+  - id: q17-operator-unsupported
+    question: "RMSNorm 在 torch_npu 2.1 里提示 'Operator RMSNorm not supported'，怎么办？"
+    expected_subagent: ascend-adapter
+    expected_wiki_hits: [torch-npu]
+    category: migration
+    difficulty: medium
+    notes: "算子不支持 = 替换工作 = adapter；陷阱：含 'Operator' + '报错' 双关键词。"
+
+  # ─── 更多 deployer 用例（2 条） ──────────────────────────────────────
+  - id: q18-mindie-docker
+    question: "MindIE 有官方的 Docker 镜像吗？怎么拉？"
+    expected_subagent: ascend-deployer
+    expected_wiki_hits: [mindie]
+    category: deployment
+    difficulty: easy
+    notes: "Docker 镜像 = 部署资产 = deployer。"
+
+  - id: q19-mindie-metrics
+    question: "MindIE 的 prometheus metrics 怎么接到 grafana？"
+    expected_subagent: ascend-deployer
+    expected_wiki_hits: [mindie]
+    category: deployment
+    difficulty: medium
+    notes: "服务运维 = deployer（不是 tuner，虽然监控和 perf 相关）。"
+
+  # ─── 更多 tuner 用例（2 条） ─────────────────────────────────────────
+  - id: q20-throughput-target
+    question: "想把 qwen2-72b 的 decode 从 80 tokens/s 提到 150，有哪些方向？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: []
+    category: tuning
+    difficulty: hard
+    notes: "吞吐目标型 = tuner；注意关键词 'tokens/s' / 'decode' 当前未入 KEYWORDS。"
+
+  - id: q21-continuous-batching
+    question: "vLLM-Ascend 的 continuous batching 参数怎么调才能塞更多并发？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: [vllm-ascend]
+    category: tuning
+    difficulty: medium
+    notes: "调参 = tuner；**陷阱**：'vLLM-Ascend' 是 deployer 强词，本题预期可能 fail。"
+
+  # ─── 更多 diagnoser 用例（2 条） ─────────────────────────────────────
+  - id: q22-silent-nan
+    question: "模型跑起来不报错但 logits 全是 NaN，怎么查？"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: []
+    category: diagnosis
+    difficulty: hard
+    notes: "静默故障 = diagnoser；**陷阱**：'不报错' 会命中 '报错' 关键词（负向语义当前不识别）。"
+
+  - id: q23-import-segfault
+    question: "torch 2.1 + torch_npu 刚 import 就 segfault，看了 dmesg 没线索"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: [torch-npu]
+    category: diagnosis
+    difficulty: hard
+    notes: "import-time 崩 = diagnoser 判定（可能 hand-off env-doctor）。陷阱：'torch_npu' 是 adapter 关键词。"
+
+  # ─── 更多 env-doctor 用例（2 条） ────────────────────────────────────
+  - id: q24-cann-driver-compat
+    question: "CANN 7.0 装好了，驱动要不要跟着升？"
+    expected_subagent: ascend-env-doctor
+    expected_wiki_hits: [cann]
+    category: env
+    difficulty: medium
+    notes: "CANN × 驱动版本搭配 = env-doctor 核心。"
+
+  - id: q25-npu-not-detected
+    question: "npu-smi 显示 no NPU found，但机器上明明有卡"
+    expected_subagent: ascend-env-doctor
+    expected_wiki_hits: []
+    category: env
+    difficulty: medium
+    notes: "硬件识别失败 = env-doctor。"
+
+  # ─── 更多 benchmarker 用例（1 条） ───────────────────────────────────
+  - id: q26-mmlu-eval
+    question: "想跑 MMLU 看看 qwen3-32b 在 910B 上的精度保持得怎么样"
+    expected_subagent: ascend-benchmarker
+    expected_wiki_hits: [qwen3, 910b]
+    category: benchmark
+    difficulty: medium
+    notes: "精度基准 = benchmarker；**陷阱**：'精度' 是 adapter 强词（3 分），本题预期可能 fail。"
+
+  # ─── 对抗性多意题（6 条，预期 1-3 条 fail） ──────────────────────────
+  - id: q27-mindie-error-at-inference
+    question: "MindIE 部署后一跑 inference 就 ACL 507013，用户端无响应"
+    expected_subagent: ascend-diagnoser
+    expected_wiki_hits: [mindie]
+    category: diagnosis
+    difficulty: hard
+    notes: "首要是定位错误 = diagnoser；**陷阱**：'MindIE' + '部署' 双 deployer 强词。"
+
+  - id: q28-gpu-npu-perf-gap
+    question: "GPU 和 NPU 同模型同输入，NPU 慢 3x，这是精度问题还是调优问题？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: []
+    category: tuning
+    difficulty: hard
+    notes: "perf gap = tuner；**陷阱**：问句自带 '精度' + '调优' 两强词。"
+
+  - id: q29-multi-domain-baseline
+    question: "我想做一个 qwen3-32b 在 910B 上的完整性能/精度基线报告，对比 vLLM-Ascend 和 MindIE"
+    expected_subagent: ascend-benchmarker
+    expected_wiki_hits: [qwen3, 910b, vllm-ascend, mindie]
+    category: benchmark
+    difficulty: hard
+    notes: "整体基线报告 = benchmarker；**陷阱**：6 个跨 subagent 强词同时出现，本题是真正的极限测试。"
+
+  - id: q30-vllm-prefill-slow
+    question: "vLLM-Ascend 起来了，但 prefill 慢得离谱，怎么调？"
+    expected_subagent: ascend-tuner
+    expected_wiki_hits: [vllm-ascend]
+    category: tuning
+    difficulty: medium
+    notes: "perf tuning = tuner；**陷阱**：'vLLM-Ascend' 是 deployer 强词。"
+
+  - id: q31-cann-upgrade-broke-acl
+    question: "刚升了 CANN，现在一跑 generate 就报 ACL 507018"
+    expected_subagent: ascend-env-doctor
+    expected_wiki_hits: [cann, acl-507018]
+    category: env
+    difficulty: hard
+    notes: "因果是环境变化 → env-doctor 主责（应 hand-off diagnoser 查 error code）；**陷阱**：ACL 是 diagnoser 强词。"
+
+  - id: q32-throughput-compare-batched
+    question: "我想看下 qwen3-32b 和 qwen2-72b 在同等 batch-size 下的吞吐对比"
+    expected_subagent: ascend-benchmarker
+    expected_wiki_hits: [qwen3]
+    category: benchmark
+    difficulty: medium
+    notes: "跨模型吞吐对比 = benchmarker；'吞吐对比' 已在 KEYWORDS，应能正确路由。"

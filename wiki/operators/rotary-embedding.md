@@ -16,6 +16,8 @@ sources: []
 
 ## Backlinks
 <!-- auto -->
+- [flash-attention](flash-attention.md)
+- [mindie](../software/mindie.md)
 
 ## Changelog
 - 2026-04-20: 占位创建。
